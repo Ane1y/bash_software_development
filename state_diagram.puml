@@ -1,0 +1,85 @@
+@startuml
+state GenerateProgram {
+  Lexer: Генерирует лексемы из входного текста
+  Expander: Реализует подстановки в соответствующие лексемы
+  Parser: Создаёт объект `Program` из входящих токенов
+  [*] --> Lexer : Строка
+  Lexer --> Expander: Токены
+  Expander --> Parser: Токены
+  Parser --> [*] : объект Program
+}
+
+state Expander {
+  state "Lexer" as LexerExp: Разбивает лексемы строк на новые лексемы после подстановки
+  [*] -> Expand
+  Expand -> LexerExp
+  LexerExp-> [*]
+}
+
+
+state Runner {
+  state execChoice <<choice>>
+  state "Exit" as execExit <<exitPoint>>
+  state "Get Executables" as GetExecutables: Обращается к окружению за путями\nк исполняемым файлам
+  state "Print Error" as PrintError:  Вывевсти собщение о том, что команда не была найдена
+
+  [*] -> GetExecutables
+  GetExecutables -> execChoice
+  execChoice --> PrintError : Один или несколько Executable\nне были найдены
+  execChoice --> Execute : Ok
+  PrintError --> [*]
+  Execute --> [*]
+  Execute -> execExit
+}
+
+state Execute {
+
+  note "Assignment" as ExN1
+  state "Update environment" as updenv
+  [*] -> updenv
+  updenv -> [*]
+
+  --
+
+  note "Cmd" as ExN2
+  state "Run process" as runprc : Запуск Executable.exec(...)
+  [*] -> runprc
+  runprc -> [*]
+
+  --
+
+  note "Pipeline" as ExN3
+
+  state f <<fork>>
+  state j <<join>>
+  [*] --> f
+  j --> [*]
+
+  f --> Proc0
+  f --> Proc1
+  f --> ProcN
+  Proc0 --> j
+  Proc1 --> j
+  ProcN --> j
+
+  Proc0: p1 = pipe_exec(STDIN)
+  Proc1: p2 = pipe_exec(p1)
+  ProcN: pipe_exec(pn)
+
+  Proc0 -[dashed]> Proc1 : Pipe 1
+  Proc1 -[dashed]> ProcN : Pipe N
+
+}
+
+
+[*] -> Init
+Init: Инициализация окружения
+Init -> ReadUserInput
+
+state "Read User Input" as ReadUserInput
+
+ReadUserInput -> GenerateProgram
+GenerateProgram --> Runner : Program
+ReadUserInput <- Runner
+[*] <- execExit
+@enduml
